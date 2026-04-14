@@ -109,18 +109,22 @@ function getFlash(): array|null {
 }
 
 /**
- * Render thông báo flash thành HTML
+ * Render thông báo flash thành HTML (pure CSS — không cần Bootstrap)
  */
 function renderFlash(): string {
     $flash = getFlash();
     if (!$flash) return '';
     $type = htmlspecialchars($flash['type']);
     $msg  = htmlspecialchars($flash['message']);
-    return "<div class=\"alert alert-{$type} alert-dismissible\" role=\"alert\">
-                {$msg}
-                <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\"></button>
-            </div>";
+    $icons = ['success' => '✅', 'error' => '⚠️', 'warning' => '⚡', 'info' => 'ℹ️'];
+    $icon = $icons[$flash['type']] ?? '📢';
+    return "<div class=\"alert alert-{$type}\" role=\"alert\" id=\"flashMsg\" style=\"position:relative\">
+                <span>{$icon} {$msg}</span>
+                <button type=\"button\" onclick=\"this.parentElement.remove()\" style=\"background:none;border:none;cursor:pointer;opacity:.5;font-size:1rem;position:absolute;right:12px;top:50%;transform:translateY(-50%)\">✕</button>
+            </div>
+            <script>setTimeout(()=>document.getElementById('flashMsg')?.remove(), 4000)</script>";
 }
+
 
 /**
  * Rút gọn văn bản dài
