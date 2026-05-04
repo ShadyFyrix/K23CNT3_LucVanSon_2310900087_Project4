@@ -2,7 +2,7 @@
 $host = 'localhost';
 $dbname = 'umact_db';
 $username = 'root'; // User mặc định của XAMPP/WAMP
-$password = 'lvson2005';     // Mật khẩu mặc định thường để trống
+$password = '123456';     // Mật khẩu mặc định thường để trống
 
 try {
     // Kết nối với charset utf8mb4 để không bị lỗi font tiếng Việt
