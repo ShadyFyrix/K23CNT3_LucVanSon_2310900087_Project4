@@ -4,7 +4,7 @@ cd /d "d:\K23CNT3-LucVanSon-2310900087\K23CNT3_LucVanSon_2310900087_Project4"
 
 git add --all
 
-git commit -m "fix(Lvs_): bugfix session — cart table, checkout flow, image rendering
+git commit -m "fix(Lvs_): bugfix session, cart table, checkout flow, image rendering
 
 --- BUG 1: Missing cart table in DB ---
   database/project4.sql    - ADD CREATE TABLE cart (UNIQUE KEY required for ON DUPLICATE KEY UPDATE)
