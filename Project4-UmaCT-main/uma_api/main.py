@@ -24,7 +24,7 @@ def get_db_connection():
     return pymysql.connect(
         host='localhost',
         user='root',
-        password='123456',
+        password='lvson2005',
         database='umact_db',
         cursorclass=pymysql.cursors.DictCursor # Trả về dạng Dictionary (JSON)
     )
@@ -122,7 +122,7 @@ def get_products():
     cursor = conn.cursor()
     sql = """
         SELECT p.*, c.name as category_name, s.name as supplier_name,
-               (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id LIMIT 1) as main_image
+               (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) as main_image
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN suppliers s ON p.supplier_id = s.id
@@ -180,7 +180,7 @@ def search_products(q: str = ""):
         # SỬA LỖI: Dùng Subquery lồng bảng product_images để lấy ảnh đầu tiên
         sql = """
             SELECT p.id, p.name, p.price, 
-                   (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id LIMIT 1) as main_image 
+                   (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) as main_image 
             FROM products p 
             WHERE p.is_active = 1
         """
@@ -373,6 +373,53 @@ def delete_voucher(voucher_id: int):
 # Model mô tả dữ liệu khi Admin cập nhật trạng thái đơn hàng
 class OrderStatusUpdate(BaseModel):
     status: str
+
+# Model tạo đơn hàng mới
+class OrderItem(BaseModel):
+    id: int       # product_id
+    quantity: int
+    price: float  # price_at_purchase
+
+class OrderCreate(BaseModel):
+    user_id: int
+    total_price: float
+    shipping_address: str
+    payment_method: int = 1   # 1=COD, 2=MoMo, 3=PayOS, 4=VNPay
+    items: list[OrderItem]
+    voucher_id: int = None
+
+# 15b. API: Tạo đơn hàng mới (POST)
+@app.post("/api/orders")
+def create_order(order: OrderCreate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Insert đơn hàng
+        sql_order = """
+            INSERT INTO orders (user_id, voucher_id, total_price, shipping_address, payment_method, status)
+            VALUES (%s, %s, %s, %s, %s, 'PENDING')
+        """
+        cursor.execute(sql_order, (
+            order.user_id, order.voucher_id, order.total_price,
+            order.shipping_address, order.payment_method
+        ))
+        order_id = cursor.lastrowid
+
+        # 2. Insert từng sản phẩm trong đơn
+        sql_items = """
+            INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
+            VALUES (%s, %s, %s, %s)
+        """
+        for item in order.items:
+            cursor.execute(sql_items, (order_id, item.id, item.quantity, item.price))
+
+        conn.commit()
+        return {"status": "success", "message": "Đặt hàng thành công!", "data": {"order_id": order_id}}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"Lỗi tạo đơn hàng: {str(e)}")
+    finally:
+        conn.close()
 
 # 16. API: Lấy danh sách tất cả đơn hàng
 @app.get("/api/orders")
@@ -964,7 +1011,7 @@ def get_user_cart(user_id: int):
     try:
         sql = """
             SELECT c.id as cart_id, c.quantity, p.*,
-                   (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id LIMIT 1) as main_image
+                   (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) as main_image
             FROM cart c
             JOIN products p ON c.product_id = p.id
             WHERE c.user_id = %s
@@ -990,6 +1037,8 @@ def add_to_cart_db(item: CartItem):
         cursor.execute(sql, (item.user_id, item.product_id, item.quantity))
         conn.commit()
         return {"status": "success", "message": "Đã cập nhật giỏ hàng trong DB"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi thêm giỏ hàng: {str(e)}")
     finally:
         conn.close()
 
@@ -1084,7 +1133,7 @@ def get_user_favorites(user_id: int):
         # Dùng JOIN để nối bảng favorites với products, và Subquery để lấy ảnh
         sql = """
             SELECT p.*, f.id as favorite_id,
-                   (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id LIMIT 1) as main_image
+                   (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1) as main_image
             FROM favorites f
             JOIN products p ON f.product_id = p.id
             WHERE f.user_id = %s

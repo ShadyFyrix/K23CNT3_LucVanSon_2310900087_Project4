@@ -101,6 +101,18 @@ CREATE TABLE reviews (
     FOREIGN KEY (product_id) REFERENCES products(id)
 );
 
+-- GIỎ HÀNG: UNIQUE KEY bắt buộc để ON DUPLICATE KEY UPDATE hoạt động đúng
+CREATE TABLE IF NOT EXISTS cart (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    product_id  INT NOT NULL,
+    quantity    INT NOT NULL DEFAULT 1,
+    added_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY  unique_cart_item (user_id, product_id),
+    FOREIGN KEY (user_id)    REFERENCES users(id)    ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
 -- ==========================================
 -- 4. NHÓM KHUYẾN MÃI & GIAO DỊCH
 -- ==========================================

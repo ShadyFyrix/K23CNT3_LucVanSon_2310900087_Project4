@@ -1,13 +1,11 @@
 <?php
 /**
- * pages/cart.php — Giỏ hàng
+ * pages/cart.php — Redirect sang Lvs_pages/Lvs_cart.php (bản cũ không dùng nữa)
+ * Field names từ API đã thay đổi → dùng bản Lvs_ mới thay thế
  */
-$pageTitle = 'Giỏ hàng — UmaCT Shop';
-$activeNav = 'shop';
-
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../utils/auth_helper.php';
-require_once __DIR__ . '/../utils/format_helper.php';
+header('Location: ' . BASE_URL . '/Lvs_pages/Lvs_cart.php', true, 301);
+exit;
 require_once __DIR__ . '/../models/cart_model.php';
 
 requireLogin();

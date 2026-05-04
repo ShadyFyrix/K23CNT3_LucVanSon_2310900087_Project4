@@ -36,11 +36,15 @@ function removeCartItem(int $userId, int $productId): array {
     return ApiClient::delete("/cart/remove/{$userId}/{$productId}");
 }
 
-/** Backend chưa có /cart/clear — xóa từng item */
+/** Backend chưa có /cart/clear — xóa từng item theo product_id */
 function clearCart(int $userId): array {
     $items = getCart($userId);
     foreach ($items as $item) {
-        ApiClient::delete("/cart/remove/{$userId}/{$item['id']}");
+        // FastAPI trả về field 'product_id' trong cart item, không phải 'id'
+        $productId = $item['product_id'] ?? $item['id'] ?? 0;
+        if ($productId) {
+            ApiClient::delete("/cart/remove/{$userId}/{$productId}");
+        }
     }
     return ['status' => 'success'];
 }

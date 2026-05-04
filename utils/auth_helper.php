@@ -17,11 +17,27 @@ if (session_status() === PHP_SESSION_NONE) {
  * Lưu thông tin user vào session sau khi đăng nhập thành công
  */
 function loginSession(array $userData): void {
-    $_SESSION['user_id']   = $userData['user_id'];
-    $_SESSION['username']  = $userData['username'];
-    $_SESSION['full_name'] = $userData['full_name'];
-    $_SESSION['role_name'] = $userData['role_name'];
-    $_SESSION['avatar_url']= $userData['avatar_url'] ?? '';
+    // FastAPI /api/login trả về field 'id' (không phải 'user_id')
+    $_SESSION['user_id']   = $userData['user_id'] ?? $userData['id'] ?? null;
+    $_SESSION['username']  = $userData['username']  ?? '';
+    $_SESSION['full_name'] = $userData['full_name'] ?? '';
+
+    // FastAPI SELECT * users chỉ có role_id (không JOIN roles)
+    // Map role_id → role_name: 1=ADMIN, 2=USER, 3=STAFF
+    if (!empty($userData['role_name'])) {
+        $_SESSION['role_name'] = $userData['role_name'];
+    } elseif (!empty($userData['role'])) {
+        $_SESSION['role_name'] = $userData['role'];
+    } else {
+        $Lvs_roleMap = [1 => 'ROLE_ADMIN', 2 => 'ROLE_USER', 3 => 'ROLE_STAFF'];
+        $_SESSION['role_name'] = $Lvs_roleMap[$userData['role_id'] ?? 2] ?? 'ROLE_USER';
+    }
+
+    $_SESSION['avatar_url'] = $userData['avatar_url'] ?? '';
+
+    if (empty($_SESSION['user_id'])) {
+        error_log('[loginSession] WARNING: user_id empty. Response keys: ' . implode(',', array_keys($userData)));
+    }
 }
 
 /**

@@ -4,55 +4,45 @@ cd /d "d:\K23CNT3-LucVanSon-2310900087\K23CNT3_LucVanSon_2310900087_Project4"
 
 git add --all
 
-git commit -m "feat(Lvs_): COMPLETE Lvs_ naming convention: Layer 1 through 7
+git commit -m "fix(Lvs_): bugfix session — cart table, checkout flow, image rendering
 
-STRATEGY: Wrapper/Adapter Pattern — zero conflict with teammates
-All Lvs_ files wrap originals. Originals untouched for team use.
+--- BUG 1: Missing cart table in DB ---
+  database/project4.sql    - ADD CREATE TABLE cart (UNIQUE KEY required for ON DUPLICATE KEY UPDATE)
+  database/fix_missing_tables.sql  - standalone fix script
 
---- Layer 1: Utils Wrappers (3 files) ---
-  utils/Lvs_api_client.php    - class Lvs_ApiClient extends ApiClient
-  utils/Lvs_auth_helper.php   - Lvs_isLoggedIn/requireLogin/getCurrentUser/isAdmin
-  utils/Lvs_format_helper.php - Lvs_formatPrice/Date/orderStatusBadge/renderFlash
+--- BUG 2: POST /api/orders missing endpoint ---
+  Project4-UmaCT-main/uma_api/main.py
+    + OrderItem / OrderCreate Pydantic models
+    + POST /api/orders endpoint (transaction: orders + order_items)
+    + except block on cart/add endpoint (was bare try/finally)
 
---- Layer 2: Model Wrappers (11 files) ---
-  models/Lvs_product/cart/order/category/supplier
-  models/Lvs_review/favorite/voucher/article/auth/user
+--- BUG 3: Checkout form POST not detected ---
+  Lvs_pages/Lvs_checkout.php
+    + <input type='hidden' name='Lvs_do_checkout'> — survives JS button.disabled
+    + PHP check $_POST['Lvs_do_checkout'] instead of disabled button value
+    + null guard for cartItems before array_map
+    + sticky error banner (position:sticky) always visible
+    + error_log debug lines for API call tracing
 
---- Layer 3: Page Includes (3 files) ---
-  Lvs_pages/includes/Lvs_header.php
-  Lvs_pages/includes/Lvs_footer.php
-  Lvs_pages/includes/Lvs_product_card.php
+--- BUG 4: Product detail wrong image ---
+  Lvs_pages/Lvs_product_detail.php
+    + decode JSON 'images' field from GET /api/products/{id}
+    + render all images as clickable thumbnails gallery
 
---- Layer 4: Lvs_pages/ (5/5 files) ---
-  Lvs_pages/Lvs_home.php     - hero, categories, featured, flash sale, news
-  Lvs_pages/Lvs_shop.php     - filter sidebar + category pills + sort
-  Lvs_pages/Lvs_cart.php     - cart CRUD with correct cart_id+product_id
-  Lvs_pages/Lvs_checkout.php - order form with correct backend items format
+--- BUG 5: Old pages/cart.php crashing ---
+  pages/cart.php  - redirect 301 to Lvs_pages/Lvs_cart.php
+  models/Lvs_cart_model.php - null guard on Lvs_getCart / Lvs_calcCartTotal
 
---- Layer 5: Lvs_user/ (4 files) ---
-  Lvs_user/Lvs_profile.php         - edit name/email/phone/address
-  Lvs_user/Lvs_order_history.php   - list orders + cancel button
-  Lvs_user/Lvs_favorites.php       - grid of fav products
-  Lvs_user/Lvs_change_password.php - validate + change pw
+--- BUG 6: Cart add silent error ---
+  Lvs_api_actions/Lvs_cart_add.php - normalize detail->message field
+  Lvs_pages/Lvs_shop.php           - alert shows d.message||d.detail||fallback
+  Lvs_pages/Lvs_product_detail.php - same alert fix + catch(err) block
 
---- Layer 6: Lvs_api_actions/ AJAX (7 files) ---
-  Lvs_cart_add/remove/update/clear
-  Lvs_favorite_toggle + Lvs_voucher_check + Lvs_order_cancel
-
---- Layer 7: auth/ (3 files) ---
-  auth/Lvs_login.php    - POST /api/login
-  auth/Lvs_register.php - POST /api/register + validation
-  auth/Lvs_logout.php   - session destroy + redirect
-
---- BUG FIX: Backend API contract sync ---
-  POST /api/cart/add             (not /cart)
-  DELETE /api/cart/remove/{u}/{p}(not /cart/{id})
-  POST /api/login                (not /auth/login)
-  POST /api/register             (not /auth/register)
-  POST /api/favorites/toggle     (toggle, not add/remove)
-  GET  /api/users/{id}/favorites (not /favorites?user_id)
-  GET  /api/users/{id}/orders    (not /orders?user_id)
-  POST /api/orders items format  [{id,quantity,price}]"
+--- BUG 7: User CRUD admin ---
+  Lvs_admin/users/Lvs_index.php     - full CRUD + modal + inline role + ban
+  Lvs_admin/users/Lvs_detail.php    - profile + order history
+  Lvs_api_actions/Lvs_user_change_role.php
+  Lvs_api_actions/Lvs_user_delete.php"
 
 git push origin main
 echo.

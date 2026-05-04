@@ -117,8 +117,13 @@ function Lvs_addToCart(Lvs_pid, Lvs_btn) {
             const b=document.getElementById('cartBadge');
             if(b) b.textContent=parseInt(b.textContent||0)+1;
             setTimeout(()=>{Lvs_btn.innerHTML=Lvs_orig;Lvs_btn.style='';Lvs_btn.disabled=false;},2000);
-        } else { alert(d.message||'Lỗi'); Lvs_btn.innerHTML=Lvs_orig; Lvs_btn.disabled=false; }
-    }).catch(()=>{Lvs_btn.innerHTML=Lvs_orig;Lvs_btn.disabled=false;});
+        } else {
+            const Lvs_msg = d.message || d.detail || 'Không thể thêm vào giỏ. Kiểm tra FastAPI.';
+            alert('⚠️ ' + Lvs_msg);
+            Lvs_btn.innerHTML=Lvs_orig; Lvs_btn.disabled=false;
+        }
+    }).catch(err=>{ alert('Lỗi kết nối: ' + err.message); Lvs_btn.innerHTML=Lvs_orig;Lvs_btn.disabled=false;});
+
 }
 function Lvs_toggleFavorite(Lvs_pid, Lvs_btn) {
     fetch('<?= BASE_URL ?>/Lvs_api_actions/Lvs_favorite_toggle.php', {

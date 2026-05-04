@@ -25,6 +25,28 @@ if (!$Lvs_productId) {
 }
 
 $Lvs_user = Lvs_getCurrentUser();
-$Lvs_res  = Lvs_addToCart($Lvs_user['user_id'], $Lvs_productId, $Lvs_quantity);
+$Lvs_uid  = (int)($Lvs_user['user_id'] ?? 0);
+
+if (!$Lvs_uid) {
+    // Session có user nhưng user_id null → session bị corrupt, yêu cầu login lại
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.',
+        'code'    => 'SESSION_EXPIRED',
+    ]);
+    exit;
+}
+
+$Lvs_res = Lvs_addToCart($Lvs_uid, $Lvs_productId, $Lvs_quantity);
+
+// Normalize: luôn đảm bảo có field 'message' để JS đọc được
+if (!isset($Lvs_res['message']) && isset($Lvs_res['detail'])) {
+    $Lvs_res['message'] = $Lvs_res['detail'];
+}
+if (empty($Lvs_res['status'])) {
+    $Lvs_res['status'] = 'error';
+    $Lvs_res['message'] = $Lvs_res['message'] ?? 'Không nhận được phản hồi từ API. Kiểm tra FastAPI đang chạy.';
+}
+
 echo json_encode($Lvs_res);
 ?>

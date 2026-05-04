@@ -28,7 +28,7 @@ $Lvs_shipping = $Lvs_subtotal >= 500000 ? 0 : 30000;
 $Lvs_discount = 0;
 $Lvs_error    = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['Lvs_place_order'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['Lvs_do_checkout'])) {
     $Lvs_address = trim($_POST['shipping_address'] ?? '');
     $Lvs_payment = (int)($_POST['payment_method'] ?? 1);
     $Lvs_vouCode = trim($_POST['voucher_code'] ?? '');
@@ -40,26 +40,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['Lvs_place_order'])) {
             $Lvs_vRes = Lvs_checkVoucher($Lvs_vouCode, $Lvs_subtotal);
             if ($Lvs_vRes) $Lvs_discount = $Lvs_vRes['discount_value'] ?? 0;
         }
-        // Backend items format: [{id: product_id, quantity, price}]
-        $Lvs_orderData = [
-            'user_id'          => $Lvs_user['user_id'],
-            'total_price'      => $Lvs_subtotal + $Lvs_shipping - $Lvs_discount,
-            'shipping_address' => $Lvs_address,
-            'payment_method'   => $Lvs_payment,
-            'items'            => array_map(fn($i) => [
-                'id'       => $i['id'],
-                'quantity' => $i['quantity'],
-                'price'    => $i['price'] ?? 0,
-            ], $Lvs_cartItems),
-        ];
-        $Lvs_res = Lvs_createOrder($Lvs_orderData);
-        if (ApiClient::isSuccess($Lvs_res)) {
-            Lvs_clearCart($Lvs_user['user_id']);
-            $Lvs_orderId = $Lvs_res['data']['order_id'] ?? $Lvs_res['order_id'] ?? '';
-            Lvs_setFlash('success', '🎉 Đặt hàng thành công! Mã đơn: #' . $Lvs_orderId);
-            header('Location: ' . BASE_URL . '/Lvs_user/Lvs_order_history.php'); exit;
+        // Guard: cartItems phải là array hợp lệ
+        if (!is_array($Lvs_cartItems) || empty($Lvs_cartItems)) {
+            $Lvs_error = 'Giỏ hàng trống hoặc không thể đọc. Vui lòng thử lại.';
         } else {
-            $Lvs_error = ApiClient::getError($Lvs_res);
+            $Lvs_orderData = [
+                'user_id'          => $Lvs_user['user_id'],
+                'total_price'      => $Lvs_subtotal + $Lvs_shipping - $Lvs_discount,
+                'shipping_address' => $Lvs_address,
+                'payment_method'   => $Lvs_payment,
+                'items'            => array_map(fn($i) => [
+                    'id'       => $i['id'],
+                    'quantity' => (int)$i['quantity'],
+                    'price'    => (float)($i['price'] ?? $i['discount_price'] ?? 0),
+                ], $Lvs_cartItems),
+            ];
+            // Debug log — xem request gửi gì
+            error_log('[Checkout] OrderData: ' . json_encode($Lvs_orderData));
+            $Lvs_res = Lvs_createOrder($Lvs_orderData);
+            error_log('[Checkout] API response: ' . json_encode($Lvs_res));
+            if (ApiClient::isSuccess($Lvs_res)) {
+                Lvs_clearCart($Lvs_user['user_id']);
+                $Lvs_orderId = $Lvs_res['data']['order_id'] ?? $Lvs_res['order_id'] ?? '';
+                Lvs_setFlash('success', '🎉 Đặt hàng thành công! Mã đơn: #' . $Lvs_orderId);
+                header('Location: ' . BASE_URL . '/Lvs_user/Lvs_order_history.php'); exit;
+            } else {
+                // Normalize error từ detail hoặc message
+                $Lvs_error = $Lvs_res['detail'] ?? $Lvs_res['message'] ?? 'Lỗi không xác định từ server.';
+            }
         }
     }
 }
@@ -91,7 +99,9 @@ require_once __DIR__ . '/includes/Lvs_header.php';
 
 <div class="container section">
     <?php if ($Lvs_error): ?>
-        <div class="alert alert-error"><?= htmlspecialchars($Lvs_error) ?></div>
+        <div style="position:sticky;top:70px;z-index:1000;background:#7f1d1d;border:1px solid #ef4444;color:#fca5a5;padding:14px 20px;border-radius:10px;margin-bottom:20px;font-weight:600;font-size:.9rem">
+            ⚠️ <strong>Lỗi đặt hàng:</strong> <?= htmlspecialchars($Lvs_error) ?>
+        </div>
     <?php endif; ?>
 
     <form method="POST" id="Lvs_checkoutForm">
@@ -188,6 +198,7 @@ require_once __DIR__ . '/includes/Lvs_header.php';
                     <span style="font-weight:800;font-size:1rem">Tổng cộng</span>
                     <span class="summary-total"><?= Lvs_formatPrice($Lvs_finalTotal) ?></span>
                 </div>
+                <input type="hidden" name="Lvs_do_checkout" value="1">
                 <button type="submit" name="Lvs_place_order" class="btn-checkout" id="Lvs_btnPlaceOrder">✅ Xác nhận đặt hàng</button>
                 <div style="margin-top:14px;text-align:center;font-size:.72rem;color:var(--text-dim);line-height:1.8">
                     🔒 Thông tin được mã hóa &amp; bảo mật
@@ -220,9 +231,18 @@ function Lvs_checkVoucherUI() {
     });
 }
 
-document.getElementById('Lvs_checkoutForm').addEventListener('submit', function() {
+document.getElementById('Lvs_checkoutForm').addEventListener('submit', function(e) {
     const Lvs_btn = document.getElementById('Lvs_btnPlaceOrder');
+    const Lvs_addr = document.getElementById('Lvs_address').value.trim();
+    if (!Lvs_addr) {
+        e.preventDefault();
+        alert('⚠️ Vui lòng nhập địa chỉ giao hàng!');
+        document.getElementById('Lvs_address').focus();
+        return;
+    }
     Lvs_btn.textContent = '⏳ Đang xử lý...'; Lvs_btn.disabled = true;
+    // Re-enable nếu PHP trả về (không redirect = có lỗi)
+    setTimeout(() => { Lvs_btn.textContent = '✅ Xác nhận đặt hàng'; Lvs_btn.disabled = false; }, 8000);
 });
 </script>
 <?php require_once __DIR__ . '/includes/Lvs_footer.php'; ?>

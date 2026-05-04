@@ -6,6 +6,7 @@
  */
 require_once __DIR__ . '/user_model.php';
 
+function Lvs_getAllUsers(): array                               { return getAllUsersAndRoles() ?? []; }
 function Lvs_getAllUsersAndRoles(): array                            { return getAllUsersAndRoles(); }
 function Lvs_getUserDetail(int $id): ?array                         { return getUserDetail($id); }
 function Lvs_updateUserStatus(int $id, string $status): array       { return updateUserStatus($id, $status); }

@@ -57,8 +57,17 @@ $pageTitle = htmlspecialchars($Lvs_product['name']) . ' — UmaCT Shop';
 $activeNav = 'shop';
 require_once __DIR__ . '/includes/Lvs_header.php';
 
-// Normalize image
-$Lvs_imgUrl = !empty($Lvs_product['image_url']) ? $Lvs_product['image_url'] : (!empty($Lvs_product['main_image']) ? $Lvs_product['main_image'] : BASE_URL.'/assets/images/no-image.png');
+// Fix: FastAPI GET /products/{id} trả 'images' là JSON string, không có 'main_image'
+$Lvs_images = [];
+if (!empty($Lvs_product['images'])) {
+    $Lvs_decoded = json_decode($Lvs_product['images'], true);
+    if (is_array($Lvs_decoded)) $Lvs_images = $Lvs_decoded;
+}
+// Fallback: nếu không có images, thử main_image từ list query (gọi từ Lvs_getAllProducts)
+if (empty($Lvs_images) && !empty($Lvs_product['main_image'])) {
+    $Lvs_images = [$Lvs_product['main_image']];
+}
+$Lvs_imgUrl = !empty($Lvs_images[0]) ? $Lvs_images[0] : BASE_URL.'/assets/images/no-image.png';
 ?>
 <div class="container section">
 
@@ -82,10 +91,18 @@ $Lvs_imgUrl = !empty($Lvs_product['image_url']) ? $Lvs_product['image_url'] : (!
                      onerror="this.src='<?= BASE_URL ?>/assets/images/no-image.png'">
             </div>
             <div class="detail-thumbs" id="Lvs_thumbsRow">
-                <div class="detail-thumb active">
-                    <img src="<?= htmlspecialchars($Lvs_imgUrl) ?>" alt=""
-                         onclick="Lvs_switchImg(this, '<?= htmlspecialchars($Lvs_imgUrl) ?>')">
+                <?php foreach($Lvs_images as $Lvs_tIdx => $Lvs_tUrl): ?>
+                <div class="detail-thumb <?= $Lvs_tIdx === 0 ? 'active' : '' ?>">
+                    <img src="<?= htmlspecialchars($Lvs_tUrl) ?>" alt=""
+                         onclick="Lvs_switchImg(this, '<?= htmlspecialchars($Lvs_tUrl) ?>')"
+                         onerror="this.parentElement.style.display='none'">
                 </div>
+                <?php endforeach; ?>
+                <?php if(empty($Lvs_images)): ?>
+                <div class="detail-thumb active">
+                    <img src="<?= BASE_URL ?>/assets/images/no-image.png" alt="">
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -268,8 +285,14 @@ function Lvs_addToCartDetail(Lvs_pid) {
         if(d.status==='success'){
             Lvs_btn.innerHTML='✅ Đã thêm vào giỏ!';
             setTimeout(()=>{Lvs_btn.innerHTML='🛒 Thêm vào giỏ hàng';Lvs_btn.disabled=false;},2000);
-        } else { alert(d.message||'Lỗi'); Lvs_btn.innerHTML='🛒 Thêm vào giỏ hàng'; Lvs_btn.disabled=false; }
-    });
+        } else {
+            const Lvs_msg = d.message || d.detail || 'Không thể thêm. Kiểm tra FastAPI đang chạy.';
+            alert('⚠️ ' + Lvs_msg);
+            Lvs_btn.innerHTML='🛒 Thêm vào giỏ hàng';
+            Lvs_btn.disabled=false;
+        }
+    }).catch(err=>{ alert('Lỗi kết nối: ' + err.message); Lvs_btn.innerHTML='🛒 Thêm vào giỏ hàng'; Lvs_btn.disabled=false; });
+
 }
 function Lvs_toggleFavoriteDetail(Lvs_pid, Lvs_btn) {
     fetch('<?= BASE_URL ?>/Lvs_api_actions/Lvs_favorite_toggle.php', {
